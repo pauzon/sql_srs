@@ -1,12 +1,20 @@
 # pylint: disable=missing-module-docstring
 
 import io
-
+import os
+import subprocess
 import duckdb
 import pandas as pd
 import streamlit as st
 
-con = duckdb.connect(database="data/exercises_sql_tables.duckdb", read_only=False)
+
+if "data" not in os.listdir():
+    os.mkdir("data")
+    exec(open("init_db.py").read())
+    # subprocess.run(["python", "init_db.py"])
+
+con = duckdb.connect(database="data/exercises_sql_tables.duckdb", read_only=True)
+
 
 with st.sidebar:
     theme = st.selectbox(
