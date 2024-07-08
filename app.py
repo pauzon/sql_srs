@@ -1,11 +1,12 @@
 # pylint: disable=missing-module-docstring
+# pylint: disable=invalid-name
 
 import os
 import logging
+from datetime import date, timedelta
+import subprocess
 import duckdb
 import streamlit as st
-from datetime import date, timedelta
-
 
 if "data" not in os.listdir():
     print("creating folder data")
@@ -14,8 +15,8 @@ if "data" not in os.listdir():
     os.mkdir("data")
 
 if "exercises_sql_tables.duckdb" not in os.listdir("data"):
-    exec(open("init_db.py").read())
-    # subprocess.run(["python", "init_db.py"])
+    subprocess.run(["python", "init_db.py"], check="True")
+# subprocess.run(["python", "init_db.py"])
 
 con = duckdb.connect(database="data/exercises_sql_tables.duckdb", read_only=False)
 
@@ -35,7 +36,7 @@ def check_users_solution(user_query: str) -> None:
         if result.compare(solution_df).shape == (0, 0):
             st.write("Correct !")
             st.balloons()
-    except KeyError as e:
+    except KeyError:
         st.write("Some columns are missing")
     n_lines_difference = result.shape[0] - solution_df.shape[0]
     if n_lines_difference != 0:
@@ -56,7 +57,9 @@ with st.sidebar:
         st.write(f"You selected {theme}")
         select_exercise_query = f"SELECT * FROM memory_state WHERE theme = '{theme}'"
     else:
-        select_exercise_query = f"SELECT * FROM memory_state"
+        select_exercise_query = (
+            "SELECT * FROM memory_state"  # f"SELECT * FROM memory_state"
+        )
 
     exercise = (
         con.execute(select_exercise_query)
@@ -66,7 +69,7 @@ with st.sidebar:
     )
     st.write(exercise)
     exercise_name = exercise.loc[0, "exercise_name"]
-    with open(f"answers/{exercise_name}.sql", "r") as f:
+    with open(f"answers/{exercise_name}.sql", "r", encoding="utf-8") as f:
         answer = f.read()
 
     solution_df = con.execute(answer).df()
@@ -83,22 +86,27 @@ for n_days in [2, 7, 21]:
     if st.button(f"Revoir dans {n_days} jours"):
         next_review = date.today() + timedelta(days=n_days)
         con.execute(
-            f"UPDATE memory_state SET last_reviewed = '{next_review}' WHERE exercise_name = '{exercise_name}'"
+            "UPDATE memory_state SET last_reviewed = ? WHERE exercise_name = ?",
+            [next_review, exercise_name],
+            #                "UPDATE memory_state SET last_reviewed = '{next_review}'\
+            #                WHERE exercise_name = '{exercise_name}'"
         )
         st.rerun()
 
 if st.button("Reset"):
-    con.execute(f"UPDATE memory_state SET last_reviewed = '1970-01-01'")
+    con.execute("UPDATE memory_state SET last_reviewed = '1970-01-01'")
+    # con.execute(f"UPDATE memory_state SET last_reviewed = '1970-01-01'")
     st.rerun()
 
 
-tab2, tab3 = st.tabs(["Tables", "Solution"])
-with tab2:
+with st.expander("Tables"):
+    st.header("Source Tables")
     exercise_tables = exercise.loc[0, "tables"]
     for table in exercise_tables:
         st.write(f"table: {table}")
         df_table = con.execute(f"SELECT * FROM {table}").df()
         st.dataframe(df_table)
 
-with tab3:
+with st.expander("Solution"):
+    st.header("Query Result / Query")
     st.write(answer)
